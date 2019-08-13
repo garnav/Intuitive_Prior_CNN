@@ -4,37 +4,21 @@
 
 import time
 import torch
+from tqdm import tqdm
 
-######### CONSTANTS #########
-BATCH_SIZE = 32
-EPOCHS = 20
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-class Params(object):
-    pass
-
-# class Params(object):
-#     def __init__(self, batch_size, test_batch_size, epochs, lr, momentum, seed, cuda, log_interval):
-#         self.batch_size = batch_size
-#         self.test_batch_size = test_batch_size
-#         self.epochs = epochs
-#         self.lr = lr
-#         self.momentum = momentum
-#         self.log_interval = log_interval
 
 def get_model():
     pass
 
-def train_net(params, dataloaders, model, criterion, optimizer):
-    begin = time.time()
+def train(params, dataloaders, model, criterion, optimizer):
+    t_begin = time.time()
 
-    best_weights = best_wgts = copy.deepcopy(model.state_dict())
+    best_weights = copy.deepcopy(model.state_dict)
     best_acc = 0.0
 
-    for epoch in range(params.num_epochs):
-        print(f'Epoch {epoch + 1}/{params.num_epochs}')
-        print('=' * 10)
-
+    for epoch in range(params.num_epoch):
+        e_begin = time.time()
         for phase in ['train', 'val']:
             if phase == 'train':
                 model.train()
@@ -43,7 +27,11 @@ def train_net(params, dataloaders, model, criterion, optimizer):
 
             loss = 0.0
             acc = 0.0
-            for inputs, labels in dataloaders[phase]:
+
+            tv_loop = tqdm(dataloaders[phase])
+            tv_loop.set_description(f'Epoch {epoch + 1}/{num_epoch} : {phase}')
+
+            for inputs, labels in tv_loop:
                 inputs = inputs.to(device)
                 labels = labels.to(device)
 
@@ -57,23 +45,28 @@ def train_net(params, dataloaders, model, criterion, optimizer):
                         l.backward()
                         optimizer.step()
 
-                loss += l.item() * inputs.size(0) #de-average to mitigate batch_num bias
-                accuracy += torch.sum(preds == labels.data)
+                #de-average to mitigate batch_num bias
+                loss += l.item() * inputs.size(0)
+                acc += torch.sum(preds == labels.data)
 
-            epoch_loss = loss / len(dataloaders[phase])
-            epoch_acc = accuracy.double() / len(dataloaders[phase])
+                tv_loop.set_postfix(loss = loss.item(), accuracy = acc.item())
 
-            print(f'{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
-            if phase == 'val' and epoch_acc > best_acc:
-                best_acc = epoch_acc
-                best_model_wts = copy.deepcopy(model.state_dict())
+        epoch_loss = loss / len(dataloaders[phase])
+        epoch_acc = accuracy.double() / len(dataloaders[phase])
+        epoch_time = time.time() - e_begin
+        print(f'Epoch {epoch + 1}/{num_epoch} {phase} loss : {epoch_loss:.4f} {phase} accuracy : {epoch_acc:.4f} in {epoch_time // 60:.0f}:{epoch_time % 60:.0f}')
+
+        if phase == 'val' and epoch_acc > best_acc:
+            best_acc = epoch_acc
+            best_model_wts = copy.deepcopy(model.state_dict())
+            utils.save_checkpoint(f'{params.name}_{epoch}', True, best_model_wts, opt_dict=None, epoch_num=epoch)
+        elif epoch % params.log_interval == 0:
+            utils.save_checkpoint(f'{params.name}_{epoch}', False, model.state_dict(), opt_dict=None, epoch_num=epoch)
 
     time_elapsed = time.time() - begin
-    print('Training complete in {:.0f}m {:.0f}s'.format(
-        time_elapsed // 60, time_elapsed % 60))
+    print(f'Training complete in {time_elapsed // 60 :.0f}:{time_elapsed % 60 :.0f}')
     print('Best val Acc: {:4f}'.format(best_acc))
 
-    # load best model weights
     model.load_state_dict(best_model_wts)
     return model
 
