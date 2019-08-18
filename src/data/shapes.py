@@ -9,8 +9,6 @@ import os
 import numpy as np
 from PIL import Image, ImageFont, ImageDraw, ImageEnhance
 
-import functools
-
 ########### MAIN ###########
 
 def create_dataset(root):
