@@ -10,10 +10,12 @@ import shutil
 import torch
 
 ######### CONSTANTS #########
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 EXTENSION = "pth.tar"
 
 ######### MAIN #########
 class Params(object):
+    #name, image_dim, num_classes, log_interval, num_epochs, batch_size
     
     def __init__(self, param_path):
         with open(param_path, 'r') as f:
@@ -43,7 +45,7 @@ def save_checkpoint(pth, is_best, state_dict, opt_dict=None, epoch_num=None):
 def load_checkpoint(state_pth, model, optimizer=None):
     fpath = f'{state_pth}.{EXTENSION}'
 
-    state = torch.load(fpath)
+    state = torch.load(fpath, device)
     if optimizer is not None:
         optimizer.load_state_dict(state['opt_dict'])
     model.load_state_dict(state['state_dict'])

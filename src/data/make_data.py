@@ -1,6 +1,6 @@
 # data_generator.py
 # Arnav Ghosh
-# 14 Aug. 2019
+# 18 Aug. 2019
 
 import numpy as np
 import os
@@ -55,9 +55,8 @@ def create_training_directories(root, pos_paths, neg_paths, train_ratio):
     else:
         raise Exception("Training and Validation Sets already exist.")
 
-
-def load_dataset(train_path, val_path):
-    train_transforms =  transforms.Compose([transforms.Resize(224),  #HARD
+def load_dataset(image_dim, train_path, val_path):
+    train_transforms =  transforms.Compose([transforms.Resize(image_dim),
                                             transforms.RandomHorizontalFlip(p=0.5),
                                             transforms.RandomRotation((-120, 120)),
                                             transforms.RandomAffine(0, translate=(0.5, 0.5)),
@@ -65,7 +64,7 @@ def load_dataset(train_path, val_path):
                                             transforms.Normalize(mean=[0.485, 0.456, 0.406], 
                                                                  std=[0.229, 0.224, 0.225])
                                             ])
-    val_transforms = transforms.Compose([transforms.Resize(224),  #HARD
+    val_transforms = transforms.Compose([transforms.Resize(image_dim),
                                          transforms.RandomHorizontalFlip(p=0.5),
                                          transforms.RandomRotation((-120, 120)),
                                          transforms.RandomAffine(0, translate=(0.5, 0.5)),

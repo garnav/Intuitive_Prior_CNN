@@ -1,6 +1,6 @@
 # train.py
 # Arnav Ghosh
-# 03 Aug. 2019
+# 18 Aug. 2019
 
 #from src.data import make_data
 import make_data
@@ -19,12 +19,12 @@ import torch.nn as nn
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ######### MAIN #########
-def get_model():
-    model = models.resnet18(pretrained=True)
-    model.fc = nn.Linear(model.fc.in_features, 2) #HARDCODE
-    return model
+def get_model(init_dim, num_classes):
+    model = models.vgg19(pretrained=True)
+    model.classifier[6] = nn.Linear(model.classifier[6].in_features, num_classes)
+    return model.to(device)
 
-def train(params, dataloaders, model, criterion, optimizer):
+def train(params, dataloaders, dataset_sizes, model, criterion, optimizer):
     t_begin = time.time()
 
     best_weights = copy.deepcopy(model.state_dict)
@@ -64,10 +64,11 @@ def train(params, dataloaders, model, criterion, optimizer):
                 tv_loop.set_postfix(loss = loss / ((i + 1) * params.batch_size), 
                                     accuracy = acc.item() / ((i + 1) * params.batch_size) )
 
-        epoch_loss = loss / len(dataloaders[phase])
-        epoch_acc = accuracy.double() / len(dataloaders[phase])
+        epoch_loss = loss / double(dataset_sizes[phase])
+        epoch_acc = acc.item() / double(dataset_sizes[phase])
         epoch_time = time.time() - e_begin
-        print(f'Epoch {epoch + 1}/{num_epoch} {phase} loss : {epoch_loss:.4f} {phase} accuracy : {epoch_acc:.4f} in {epoch_time // 60:.0f}:{epoch_time % 60:.0f}')
+        print(f'Epoch {epoch + 1}/{params.num_epochs} {phase} loss : {epoch_loss:.4f} \
+                                                      {phase} accuracy : {epoch_acc:.4f} in {epoch_time // 60:.0f} min:{epoch_time % 60:.0f} s')
 
         if phase == 'val' and epoch_acc > best_acc:
             best_acc = epoch_acc
@@ -76,7 +77,7 @@ def train(params, dataloaders, model, criterion, optimizer):
         elif epoch % params.log_interval == 0:
             utils.save_checkpoint(f'{params.name}_{epoch}', False, model.state_dict(), opt_dict=None, epoch_num=epoch)
 
-    time_elapsed = time.time() - begin
+    time_elapsed = time.time() - t_begin
     print(f'Training complete in {time_elapsed // 60 :.0f}:{time_elapsed % 60 :.0f}')
     print('Best val Acc: {:4f}'.format(best_acc))
 
@@ -86,12 +87,13 @@ def train(params, dataloaders, model, criterion, optimizer):
 def main(params_path, train_path, val_path):
     params = utils.Params(params_path)
 
-    train_loader, val_loader = make_data.load_dataset(train_path, val_path)
+    train_loader, val_loader = make_data.load_dataset(params.image_dim, train_path, val_path)
     dataloaders = {"train" : torch.utils.data.DataLoader(train_loader, batch_size=params.batch_size, shuffle=True), 
                    "val" : torch.utils.data.DataLoader(val_loader, batch_size=params.batch_size, shuffle=True)}
+    dataset_sizes = {"train" : len(train_loader), "val" : len(val_loader)}
 
-    model = get_model()
+    model = get_model(params.image_dim, params.num_classes)
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
-    train(params, dataloaders, model, criterion, optimizer)
+    train(params, dataloaders, dataset_sizes, model, criterion, optimizer)
