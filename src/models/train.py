@@ -1,6 +1,6 @@
 # train.py
 # Arnav Ghosh
-# 18 Aug. 2019
+# 22 Aug. 2019
 
 #from src.data import make_data
 import make_data
@@ -12,6 +12,7 @@ import time
 from tqdm import tqdm
 
 import torch
+from torch.autograd import Variable
 import torchvision.models as models
 import torch.nn as nn
 
@@ -20,8 +21,11 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ######### MAIN #########
 def get_model(init_dim, num_classes):
-    model = models.vgg19(pretrained=True)
-    model.classifier[6] = nn.Linear(model.classifier[6].in_features, num_classes)
+    model = models.vgg16(pretrained=True)
+    t_out = model(Variable(torch.zeros(1, 3, init_dim, init_dim)))
+
+    model.classifier[6] = nn.Linear(t_out.size(1) * t_out.size(2) * t_out.size(3), 
+                                    num_classes)
     return model.to(device)
 
 def train(params, dataloaders, dataset_sizes, model, criterion, optimizer):

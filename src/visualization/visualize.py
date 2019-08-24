@@ -1,6 +1,6 @@
 # visualize.py
 # Arnav Ghosh
-# 20 Aug. 2019
+# 22 Aug. 2019
 
 import torch
 from torch.utils.data import Dataset
@@ -47,7 +47,6 @@ def visualize_results(model, img_dim, img_paths, labels):
     with torch.no_grad():
         for i, (inputs, label) in enumerate(vis_loader):
             inputs = inputs.to(device)
-            label = label.to(device)
 
             outputs = model(inputs)
             _, preds = torch.max(outputs, 1)

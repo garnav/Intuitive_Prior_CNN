@@ -30,7 +30,6 @@ class Params(object):
     def dict(self):
         return self.__dict__
     
-
 def save_checkpoint(pth, is_best, state_dict, opt_dict=None, epoch_num=None):
     state = { 'state_dict' : state_dict,
               'opt_dict' : opt_dict,
