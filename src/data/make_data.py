@@ -4,6 +4,7 @@
 
 import numpy as np
 import os
+from PIL import ImageOps
 import shutil
 
 import torch
@@ -57,14 +58,16 @@ def create_training_directories(root, pos_paths, neg_paths, train_ratio):
 
 def load_dataset(image_dim, train_path, val_path):
     train_transforms =  transforms.Compose([transforms.Resize(image_dim),
+                                            ImageOps.invert,
                                             transforms.RandomHorizontalFlip(p=0.5),
                                             transforms.RandomRotation((-120, 120)),
                                             transforms.RandomAffine(0, translate=(0.5, 0.5)),
                                             transforms.ToTensor(),
                                             transforms.Normalize(mean=[0.485, 0.456, 0.406], 
-                                                                 std=[0.229, 0.224, 0.225])
+                                                                std=[0.229, 0.224, 0.225])
                                             ])
     val_transforms = transforms.Compose([transforms.Resize(image_dim),
+                                         ImageOps.invert,
                                          transforms.RandomHorizontalFlip(p=0.5),
                                          transforms.RandomRotation((-120, 120)),
                                          transforms.RandomAffine(0, translate=(0.5, 0.5)),

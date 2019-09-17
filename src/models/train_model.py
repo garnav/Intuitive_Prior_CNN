@@ -1,6 +1,6 @@
 # train.py
 # Arnav Ghosh
-# 24 Aug. 2019
+# 6 Sept. 2019
 
 #from src.data import make_data
 import make_data
@@ -58,9 +58,13 @@ def train(params, dataloaders, dataset_sizes, model, criterion, optimizer):
             vis_i = np.random.choice(len(tv_loop)) # LOGGING
 
             for i, (inputs, labels) in enumerate(tv_loop):
-                if vis_i == i:
-                    for param in vis_params:
-                        model.state_dict(keep_vars=True).get(param).register_forward_hook(lambda module, input, output : write_activations(param, writer, epoch, input, output))
+                if vis_i == i and phase == "train":
+                    hooks = []
+                    vis_modules = list(map(lambda x : x[:x.rindex(".")], vis_params))
+                    for name, module in model.named_modules():
+                        if name in vis_modules:
+                            #hooks.append(module.register_forward_hook(lambda self, input, output : write_activations(name, writer, epoch, input[0], output[0])))
+                            hooks.append(module.register_forward_hook(lambda self, input, output, n=name :  write_activations(n, writer, epoch, input[0], output[0]) ))
 
                 inputs = inputs.to(device)
                 labels = labels.to(device)
@@ -77,10 +81,10 @@ def train(params, dataloaders, dataset_sizes, model, criterion, optimizer):
 
                         # LOGGING
                         if vis_i == i:
-                            for param in vis_params:
+                            for j, param in enumerate(vis_params):
                                 writer.add_histogram(f'{"Weights"}/{param}', model.state_dict(keep_vars=True).get(param), epoch)
                                 writer.add_histogram(f'{"Gradients"}/{param}', model.state_dict(keep_vars=True).get(param).grad, epoch)
-                                model.state_dict(keep_vars=True).get(param).hook.remove()
+                                hooks[j].remove()
 
                 #de-average to mitigate batch_num bias
                 loss += l.item() * inputs.size(0)
@@ -100,9 +104,9 @@ def train(params, dataloaders, dataset_sizes, model, criterion, optimizer):
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
-                utils.save_checkpoint(f'{params.name}_{epoch}', True, best_model_wts, opt_dict=None, epoch_num=epoch)
+                utils.save_checkpoint(f'{params.weights_dir}{params.name}_{epoch}', True, best_model_wts, opt_dict=None, epoch_num=epoch)
             elif phase == 'val' and (epoch % params.log_interval == 0):
-                utils.save_checkpoint(f'{params.name}_{epoch}', False, model.state_dict(), opt_dict=None, epoch_num=epoch)
+                utils.save_checkpoint(f'{params.weights_dir}{params.name}_{epoch}', False, model.state_dict(), opt_dict=None, epoch_num=epoch)
         
     time_elapsed = time.time() - t_begin
     print(f'Training complete in {time_elapsed // 60 :.0f} min : {time_elapsed % 60 :.0f} s')
@@ -113,22 +117,27 @@ def train(params, dataloaders, dataset_sizes, model, criterion, optimizer):
 
 def main(params_path, train_path, val_path):
     params = utils.Params(params_path)
-
+    
     train_loader, val_loader = make_data.load_dataset(params.image_dim, train_path, val_path)
     dataloaders = {"train" : torch.utils.data.DataLoader(train_loader, batch_size=params.batch_size, shuffle=True), 
                    "val" : torch.utils.data.DataLoader(val_loader, batch_size=params.batch_size, shuffle=True)}
+                   
     dataset_sizes = {"train" : len(train_loader), "val" : len(val_loader)}
 
-    model = models.create_model(params.image_dim, params.num_classes, False)
+    model = models.create_model(params.image_dim, params.num_classes, True)
+    
     criterion = nn.BCEWithLogitsLoss()
-    print("new opt")
+    #print("new opt")
     #optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
     optimizer = torch.optim.Adam([{'params' : list(model.parameters())[:-2]}, 
-                                  {'params' : model.fc.parameters(), 'lr' : 0.0005}], lr=0.1)
+                                  {'params' : model.fc.parameters(), 'lr' : 0.00001}], lr=0.001)
+    #optimizer = torch.optim.SGD([{'params' : list(model.parameters())[:-2]}, 
+    #                              {'params' : model.fc.parameters(), 'lr' : 0.0001}], lr=0.001)
+    #optimizer = torch.optim.Adam([{'params' : model.features.parameters()}, 
+    #                              {'params' : model.classifier.parameters(), 'lr' : 0.0005}], lr=0.005)
 
     train(params, dataloaders, dataset_sizes, model, criterion, optimizer)
 
-
-def write_activations(param, writer, epoch, input, output):
-    writer.add_histogram(f'{"Input"}/{param}', input, epoch)
-    writer.add_histogram(f'{"Output"}/{param}', output, epoch)
+def write_activations(name, writer, epoch, input, output):
+    writer.add_histogram(f'{"Input"}/{name}', input, epoch)
+    writer.add_histogram(f'{"Output"}/{name}', output, epoch)

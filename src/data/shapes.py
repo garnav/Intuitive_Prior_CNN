@@ -7,7 +7,7 @@ from shape_constants import *
 import copy
 import os
 import numpy as np
-from PIL import Image, ImageFont, ImageDraw, ImageEnhance
+from PIL import Image, ImageFont, ImageDraw, ImageEnhance, ImageFilter
 
 ########### MAIN ###########
 
@@ -71,6 +71,7 @@ def repeating_circles(root, uniform = True):
     patterned_shapes(root, all_bags, init_bags, joint_variation_config, draw_circles, "circles", uniform)
 
 def repeating_rectangles(root, uniform = True):
+    #permute_rectangles_80_3_30_2_0_0_20_0_True
     # [lengths, widths, rotations, length_incs, width_incs, rotation_incs, x_space_incs, y_space_incs]
     # [   0   ,    1  ,      2   ,       3    ,     4     ,       5      ,        6    ,       7     ]
     all_bags = [RECT_LENGTHS, RECT_WIDTHS, RECT_ROTATIONS, RECT_LENGTH_INCS, 
@@ -94,9 +95,10 @@ def patterned_shapes(root, all_bags, init_bags, joint_variation_config, draw_fun
         permutations += generate_permutations(bags)
 
     for i, perm in enumerate(permutations):
-        x, y = perm[0]/2, DIM / 2 #TODO: How do we know the first one is length
-
-        img = draw_func(x, y, *perm, uniform)
+        img = Image.new('RGB', (DIM, DIM), color = 'white')
+        for y in range(perm[1], DIM - perm[1], max(perm[1] * 5, int(DIM/5))):
+            x = perm[0]/2
+            img = draw_func(x, y, *perm, uniform, img)
         img.save(os.path.join(root, f"permute_{shape}_{'_'.join(list(map(str, perm)))}_{uniform}.jpg"), "JPEG")
 
 def symmetric_shapes(root, uniform = True):
@@ -108,10 +110,10 @@ def symmetric_shapes(root, uniform = True):
 ########### DRAWING HELPERS ###########
 
 def draw_rectangles(init_x, init_y, init_length, init_width, init_rotation, \
-                    length_inc, width_inc, rotation_inc, x_space_inc, y_space_inc, uniform = True):
+                    length_inc, width_inc, rotation_inc, x_space_inc, y_space_inc, uniform = True, img=None):
     leng, wid, rot, x, y = init_length, init_width, init_rotation, init_x, init_y
 
-    img = Image.new('RGB', (DIM, DIM), color = 'white')
+    #img = Image.new('RGB', (DIM, DIM), color = 'white')
     draw = ImageDraw.Draw(img)
 
     while x < DIM and y < DIM:
@@ -140,10 +142,10 @@ def draw_rectangles(init_x, init_y, init_length, init_width, init_rotation, \
         
     return img
 
-def draw_circles(init_x, init_y, init_radius, radius_inc, x_space_inc, y_space_inc, uniform = True):
+def draw_circles(init_x, init_y, init_radius, radius_inc, x_space_inc, y_space_inc, uniform = True, img=None):
     radius, x, y = init_radius, init_x, init_y
 
-    img = Image.new('RGB', (DIM, DIM), color = 'white')
+    #img = Image.new('RGB', (DIM, DIM), color = 'white')
     draw = ImageDraw.Draw(img)
 
     while x < DIM and y < DIM:
@@ -234,6 +236,34 @@ def draw_symmetric_shape(num_sections, radius, uniform):
 
     return overall_config, img
 
+########### COLOUR HELPERS ###########
+
+def recolor_image(image):
+    colour_thresh = 127
+    noise_mean = 0
+    noise_std = 1
+
+    colour_choices = [[102, 178, 255], [153, 153, 255], [255, 153, 51], [255, 102, 102], [51, 255, 153], [204, 0, 102]]
+    colour = colour_choices[np.random.choice(range(len(colour_choices)), 1)[0]]          
+
+    img_arr = np.array(np.asarray(image))
+
+    for col_idx in range(len(colour)):
+        thresh = np.where(img_arr[:,:,col_idx] < colour_thresh)
+        img_arr[thresh[0],thresh[1],col_idx] = colour[col_idx]
+
+    img_noise = Image.fromarray(img_arr + np.random.normal(noise_mean, noise_std, img_arr.shape).astype(np.uint8))
+    img_noise = np.array(np.asarray(img_noise.filter(ImageFilter.GaussianBlur(radius = 3))))
+    # ASSUMES SAME VALUES ACROSS ALL CHANNELS
+    for i in range(3):
+        img_noise[thresh[0],thresh[1], i] = img_arr[thresh[0],thresh[1], i] 
+
+    #img_arr += np.random.normal(noise_mean, noise_std, img_arr.shape).astype(np.uint8)
+    #img_arr = np.clip(img_arr, 0, 255) 
+    img_arr = np.clip(img_noise, 0, 255)
+
+    return Image.fromarray(img_arr)
+
 ########### MISC. HELPERS ###########
 
 def generate_permutations(bags):
@@ -250,3 +280,17 @@ def generate_permutations(bags):
 # TODO:
 # Use other shapes --> eg: triangle
 # Try alternating different shapes
+
+#folders = ["train", "val"]
+#classes = ["0", "1"]
+
+#for folder in folders:
+#    for c in classes:
+#        pth = os.path.join("Data", folder, c)
+#        img_fnames = os.listdir(pth)
+
+#        for fname in img_fnames:
+#            img_pth = os.path.join(pth, fname)
+#            img = Image.open(img_pth).convert('RGB')
+#            img = recolor_image(img)
+#            img.save(img_pth)
